@@ -1,0 +1,113 @@
+<launch>
+  <arg name="input_cloud" default="/kaida_alien/openni_camera/depth_registered/points" />
+
+  <group ns="ssd">
+
+    <node name="multi_euclidean_clustering"
+          pkg="nodelet" type="nodelet"
+          args="standalone jsk_pcl/EuclideanClustering"
+          output="screen">
+      <remap from="~input/cluster_indices" to="/ssd_object_detector/output/cluster_indices" />
+      <remap from="~input" to="/$(arg input_cloud)" />
+      <rosparam subst_value="true">
+        tolerance: 0.02
+        min_size: 0
+        max_size: 307200
+        approximate_sync: true
+        downsample_enable: true
+        multi: true
+        queue_size: 1000
+        cluster_filter: 1
+      </rosparam>
+    </node>
+
+    <node name="multi_euclidean_cluster_point_indices_decomposer"
+          pkg="nodelet" type="nodelet"
+          clear_params="true"
+          args="standalone jsk_pcl/ClusterPointIndicesDecomposer">
+      <remap from="~input" to="/$(arg input_cloud)" />
+      <remap from="~target" to="/ssd/multi_euclidean_clustering/output" />
+      <rosparam>
+        align_boxes: true
+        align_boxes_with_plane: false
+        use_pca: true
+        approximate_sync: false
+        queue_size: 100
+        target_frame_id: base_link
+      </rosparam>
+    </node>
+
+    <node name="multi_euclidean_cluster_point_indices_decomposer_original"
+          pkg="nodelet" type="nodelet"
+          args="standalone jsk_pcl/ClusterPointIndicesDecomposer">
+      <remap from="~input" to="/$(arg input_cloud)" />
+      <remap from="~target" to="/ssd_object_detector/output/cluster_indices" />
+      <rosparam>
+        approximate_sync: true
+      </rosparam>
+    </node>
+
+    <node name="labeled_bounding_box_publisher"
+          pkg="sample_multi_euclidean" type="labeled_bounding_box_publisher.py"
+          output="screen">
+      <rosparam command="load"
+                file="$(find sample_multi_euclidean)/modules/ssd_labels.yaml" />
+      <remap from="~input/instance_boxes" to="/ssd/multi_euclidean_cluster_point_indices_decomposer/boxes"/>
+      <remap from="~input/instance_labels" to="/ssd_label"/>
+      <rosparam subst_value="true">
+        approximate_sync: true
+        with_cluster_box: false
+      </rosparam>
+    </node>
+
+    <node name="multi_euclidean_cluster_point_indices_decomposer_aligned"
+          pkg="nodelet" type="nodelet"
+          clear_params="true"
+          args="standalone jsk_pcl/ClusterPointIndicesDecomposer">
+      <remap from="~input" to="/$(arg input_cloud)" />
+      <remap from="~target" to="/ssd/multi_euclidean_clustering/output" />
+      <rosparam>
+        align_boxes: true
+        align_boxes_with_plane: false
+        approximate_sync: false
+        queue_size: 100
+        target_frame_id: base_link
+        sort_by: input_indices
+        use_pca: false
+      </rosparam>
+    </node>
+
+
+    <node name="labeled_bounding_box_publisher_aligned"
+          pkg="sample_multi_euclidean" type="labeled_bounding_box_publisher.py"
+          output="screen">
+      <rosparam command="load"
+                file="$(find sample_multi_euclidean)/modules/ssd_labels.yaml" />
+      <remap from="~input/instance_boxes" to="/ssd/multi_euclidean_cluster_point_indices_decomposer_aligned/boxes"/>
+      <remap from="~input/instance_labels" to="/ssd_label"/>
+      <rosparam subst_value="true">
+        approximate_sync: true
+        with_cluster_box: false
+      </rosparam>
+    </node>
+
+    <node name="cluster_box_publisher"
+          pkg="neatness_estimator" type="cluster_box_publisher.py"
+          output="screen">
+      <remap from="~input"
+             to="/ssd/labeled_bounding_box_publisher_aligned/output/labeled_instance_boxes" />
+      <remap from="~output"
+             to="/ssd/labeled_bounding_box_publisher_aligned/output/labeled_cluster_boxes" />
+      <rosparam command="load" file="$(find sample_multi_euclidean)/modules/ssd_labels.yaml" />
+      <rosparam subst_value="true">
+        thresh: 0.35
+      </rosparam>
+    </node>
+
+  </group>
+
+  <include file="$(find neatness_estimator)/launch/vision_server.launch">
+    <arg name="labels" value="$(find sample_multi_euclidean)/modules/ssd_labels.yaml" />
+  </include>
+
+</launch>

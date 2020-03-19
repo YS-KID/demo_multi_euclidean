@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find sample_multi_euclidean)/launch/multi_euclidean_clastering_decomposer.launch" />
+  <include file="$(find hsi_color_filter)/launch/hsi_color_filter.launch" />
+</launch>

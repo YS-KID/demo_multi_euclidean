@@ -1,0 +1,24 @@
+<launch>
+  <arg name="input_cloud" default="/kaida_alien/openni_camera/depth_registered/points" />
+
+  <group ns="sample">
+
+   <node name="multi_euclidean_cluster_point_indices_decomposer"
+          pkg="nodelet" type="nodelet"
+          clear_params="true"
+          args="standalone jsk_pcl/ClusterPointIndicesDecomposer">
+      <remap from="~input" to="/$(arg input_cloud)" />
+      <remap from="~target" to="/ssd_object_detector/output/cluster_indices" />
+      <rosparam>
+        align_boxes: true
+        align_boxes_with_plane: false
+        use_pca: true
+        approximate_sync: true
+        queue_size: 100
+        target_frame_id: base_link
+      </rosparam>
+    </node>
+
+  </group>
+
+</launch>

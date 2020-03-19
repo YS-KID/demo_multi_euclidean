@@ -1,0 +1,70 @@
+<launch>
+
+  <arg name="INPUT" default="/kaida_alien/openni_camera/depth_registered/points"/>
+  <arg name="DEFAULT_NAMESPACE_BLUE" default="HSI_color_filter_blue"/>
+  <arg name="FILTER_NAME_SUFFIX" default=""/>
+  <arg name="OUTPUT" default="hsi_output$(arg FILTER_NAME_SUFFIX)"/>
+
+  <arg name="h_max_blue" default="-41" />
+  <arg name="h_min_blue" default="-126" />
+  <arg name="s_max_blue" default="219" />
+  <arg name="s_min_blue" default="45" />
+  <arg name="i_max_blue" default="105" />
+  <arg name="i_min_blue" default="37" />
+
+  <arg name="create_manager" default="true" />
+  <arg name="manager" default="hsi_filter_manager$(arg FILTER_NAME_SUFFIX)" />
+
+  <!--青を見るけるノード-->
+  <group ns="$(arg DEFAULT_NAMESPACE_BLUE)">
+    <node if="$(arg create_manager)"
+          pkg="nodelet" type="nodelet" name="$(arg manager)"
+          args="manager" output="screen"/>
+
+    <node pkg="nodelet" type="nodelet" name="hsi_filter$(arg FILTER_NAME_SUFFIX)"
+          args="standalone jsk_pcl/HSIColorFilter $(arg manager)" output="screen">
+      <remap from="~input" to="$(arg INPUT)" />
+      <remap from="~output" to="$(arg OUTPUT)" />
+      <rosparam>
+        use_indices: false
+        keep_organized: true
+      </rosparam>
+      <param name="h_limit_max" value="$(arg h_max_blue)" />
+      <param name="h_limit_min" value="$(arg h_min_blue)" />
+      <param name="s_limit_max" value="$(arg s_max_blue)" />
+      <param name="s_limit_min" value="$(arg s_min_blue)" />
+      <param name="i_limit_max" value="$(arg i_max_blue)" />
+      <param name="i_limit_min" value="$(arg i_min_blue)" />
+    </node>
+
+    <node pkg="nodelet" type="nodelet" name="euclidean_clustering$(arg FILTER_NAME_SUFFIX)"
+          args="standalone jsk_pcl/EuclideanClustering $(arg manager)" output="screen">
+      <remap from="~input" to="$(arg OUTPUT)" />
+      <rosparam>
+        tolerance: 0.02
+        min_size: 200
+      </rosparam>
+    </node>
+
+    <node pkg="nodelet" type="nodelet"
+          name="cluster_decomposer$(arg FILTER_NAME_SUFFIX)"
+          args="standalone jsk_pcl/ClusterPointIndicesDecomposerZAxis $(arg manager)"
+          output="screen" clear_params="true">
+      <remap from="~input" to="$(arg OUTPUT)" />
+      <remap from="~target" to="euclidean_clustering$(arg FILTER_NAME_SUFFIX)/output" />
+      <remap from="~debug_output" to="debug_output$(arg FILTER_NAME_SUFFIX)" />
+      <remap from="~boxes" to="boxes$(arg FILTER_NAME_SUFFIX)" />
+      <rosparam>
+      </rosparam>
+      <param name="align_boxes" value="True" />
+      <param name="align_boxes_with_plane" value="False" />
+      <param name="target_frame_id" value="/base_link" />
+    </node>
+
+    <node name="daisha_box_publisher"
+          pkg="hsi_color_filter" type="publish_daisha_box.py"
+          output="screen" />
+
+  </group>
+</launch>
+
